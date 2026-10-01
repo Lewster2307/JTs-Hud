@@ -4,7 +4,7 @@
   "description": "A simple counter-strike hud management application built with Electron and Vite.",
   "main": "./out/main/index.js",
   "author": "John Timmermann",
-  "homepage": "https://github.com/JohnTimmermann/JTs-Hud",
+  "homepage": "https://github.com/Lewster2307/JTs-Hud",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
