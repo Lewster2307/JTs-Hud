@@ -34,6 +34,12 @@
 - **Required HUD Setup & Quick Console Commands**: Displays a setup banner in the HUDs tab explaining that the game must be in "Fullscreen Windowed" mode for the HUD overlay to appear in front of the game, along with recommended CS2 console commands formatted with semicolons and a one-click copy button.
 
 ---
+#### Development Commands
+`npm run dev` - Start the development server with hot reload
+
+`npm run build:win`  - Build the app for Windows (x64) and package it into an installer `.exe` file
+
+---
 <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 # JTs Hud (Formally OpenHud)
 
