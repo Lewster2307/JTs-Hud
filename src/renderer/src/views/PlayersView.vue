@@ -5,6 +5,7 @@ import BaseBadge from '../components/base/BaseBadge.vue';
 import PlayerForm from '../features/players/components/PlayerForm.vue';
 import PlayersPageHeader from '../features/players/components/PlayersPageHeader.vue';
 import PlayersBulkBar from '../features/players/components/PlayersBulkBar.vue';
+import PlayersAssignTeamModal from '../features/players/components/PlayersAssignTeamModal.vue';
 import { usePlayersView } from '../features/players/composables/usePlayersView';
 import { API_URL } from '../index';
 
@@ -12,20 +13,34 @@ const {
   players, availableTeams, isPlayersLoading, sortedPlayers, teamMap, tableHeaders,
   sortKey, sortDir, handleSort,
   selectedPlayerIds, handleSelectionChange, handleDeleteSelected, handleDeleteAll,
+  isAssignTeamModalOpen, selectedTeamForAssign, isAssigningTeam,
+  openAssignTeamModal, handleAssignTeam,
   isModalOpen, isEditing, formData, handleSave, openCreateModal, openEditModal,
-  exportPlayers, importPlayers, deletePlayer,
+  deletePlayer,
 } = usePlayersView();
 
 const baseUrl = API_URL.replace('/api', '');
 
+const openSteamProfile = (steamid: string) => {
+  const cleanId = String(steamid).trim();
+  if (cleanId) {
+    window.api.openExternal(`http://steamcommunity.com/profiles/${cleanId}`);
+  }
+};
+
+const openHltvSearch = (username: string) => {
+  const cleanName = String(username || '').trim();
+  if (cleanName) {
+    window.api.openExternal(`https://www.hltv.org/search?query=${encodeURIComponent(cleanName)}`);
+  }
+};
+
 </script>
 
 <template>
-  <div class="p-6 bg-surface text-zinc-200 min-h-screen">
+  <div class="p-6 bg-surface text-zinc-200 min-h-full">
     <PlayersPageHeader
       :players-count="players.length"
-      @import="importPlayers"
-      @export="exportPlayers(players)"
       @delete-all="handleDeleteAll"
       @add="openCreateModal"
     />
@@ -33,6 +48,7 @@ const baseUrl = API_URL.replace('/api', '');
     <PlayersBulkBar
       v-if="selectedPlayerIds.length > 0"
       :selected-count="selectedPlayerIds.length"
+      @assign-team="openAssignTeamModal"
       @delete-selected="handleDeleteSelected"
     />
 
@@ -41,6 +57,8 @@ const baseUrl = API_URL.replace('/api', '');
       :items="sortedPlayers"
       :is-loading="isPlayersLoading"
       :selectable="true"
+      :column-toggle="true"
+      storage-key="players-table-columns"
       :sort-key="sortKey"
       :sort-dir="sortDir"
       @edit="openEditModal"
@@ -56,7 +74,24 @@ const baseUrl = API_URL.replace('/api', '');
 
       <template #cell-username="{ item }">
         <div class="font-bold text-text-main flex items-center gap-2">
-          {{ item.username }}
+          <button
+            type="button"
+            @click.stop="openHltvSearch(item.username)"
+            class="hover:text-primary hover:underline transition-colors inline-flex items-center gap-1.5 group/hltv cursor-pointer text-left"
+            title="Search player on HLTV"
+          >
+            <span>{{ item.username }}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="size-3 text-zinc-500 group-hover/hltv:text-primary transition-colors shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
           <BaseBadge v-if="item.isCoach" variant="red">Coach</BaseBadge>
           <BaseBadge v-if="item.country">{{ item.country }}</BaseBadge>
         </div>
@@ -70,6 +105,27 @@ const baseUrl = API_URL.replace('/api', '');
           </div>
         </div>
         <span v-else class="text-zinc-600 italic text-xs">No team</span>
+      </template>
+
+      <template #cell-country="{ item }">
+        <BaseBadge v-if="item.country">{{ item.country }}</BaseBadge>
+        <span v-else class="text-zinc-600 text-xs italic">—</span>
+      </template>
+
+      <template #cell-steamid="{ item }">
+        <button
+          v-if="item.steamid"
+          type="button"
+          @click.stop="openSteamProfile(item.steamid)"
+          class="font-mono text-xs text-zinc-400 hover:text-primary hover:underline select-all transition-colors inline-flex items-center gap-1.5 group/steam cursor-pointer"
+          title="Open Steam profile in browser"
+        >
+          <span>{{ item.steamid }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="size-3 text-zinc-500 group-hover/steam:text-primary transition-colors shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </button>
+        <span v-else class="text-zinc-600 text-xs italic">—</span>
       </template>
     </BaseTable>
 
@@ -85,8 +141,19 @@ const baseUrl = API_URL.replace('/api', '');
         :initial-data="formData"
         :teams="availableTeams"
         :is-editing="isEditing"
+        :existing-players="players"
         @submit="handleSave"
       />
     </BaseModal>
+
+    <PlayersAssignTeamModal
+      :is-open="isAssignTeamModalOpen"
+      :teams="availableTeams"
+      :player-count="selectedPlayerIds.length"
+      v-model:selected-team-id="selectedTeamForAssign"
+      :is-assigning="isAssigningTeam"
+      @close="isAssignTeamModalOpen = false"
+      @confirm="handleAssignTeam"
+    />
   </div>
 </template>

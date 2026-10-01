@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import { useSettings } from '../../features/settings/composables/useSettings';
 import BaseButton from './BaseButton.vue';
 import BaseCheckbox from './BaseCheckbox.vue';
@@ -7,10 +7,25 @@ import BaseCheckbox from './BaseCheckbox.vue';
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 
-const { settings, isLoading, isSaving, fetchSettings } = useSettings();
+const { settings, defaultPageSize, setDefaultPageSize, isLoading, isSaving, fetchSettings, saveSettings } = useSettings();
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && props.open) {
+    emit('close');
+  }
+};
 
 watch(() => props.open, (val) => {
-  if (val) fetchSettings();
+  if (val) {
+    fetchSettings(true);
+    window.addEventListener('keydown', handleKeydown);
+  } else {
+    window.removeEventListener('keydown', handleKeydown);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
 });
 
 // --- GSI Config Installation ---
@@ -73,7 +88,35 @@ const installGsiCfg = async () => {
                   <p class="text-sm font-medium text-zinc-200">Auto Switch Sides</p>
                   <p class="text-xs text-zinc-500 mt-0.5">Automatically flip team sides at halftime</p>
                 </div>
-                <BaseCheckbox v-model="settings.autoSwitchSides" :disabled="isSaving" size="md" class="text-primary" />
+                <BaseCheckbox
+                  :model-value="settings.autoSwitchSides"
+                  :disabled="isSaving"
+                  size="md"
+                  class="text-primary"
+                  @update:model-value="(val) => saveSettings({ autoSwitchSides: val })"
+                />
+              </div>
+            </div>
+
+            <!-- Section: Preferences -->
+            <div class="border-t border-border pt-4">
+              <p class="text-xs font-semibold capitalize text-zinc-500 mb-3">Preferences</p>
+
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-zinc-200">Default Rows Per Page</p>
+                  <p class="text-xs text-zinc-500 mt-0.5">Default pagination size for tables</p>
+                </div>
+                <select
+                  :value="defaultPageSize"
+                  class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary cursor-pointer"
+                  @change="(e) => setDefaultPageSize(Number((e.target as HTMLSelectElement).value))"
+                >
+                  <option :value="10">10</option>
+                  <option :value="25">25</option>
+                  <option :value="50">50</option>
+                  <option :value="100">100</option>
+                </select>
               </div>
             </div>
 

@@ -55,8 +55,41 @@ const handleSelect = (value: string | number) => {
 };
 
 const handleClear = () => {
-  emit('update:modelValue', null);
+  emit('update:modelValue', '');
   searchQuery.value = '';
+};
+
+const handleInputKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isOpen.value) {
+    e.stopPropagation();
+    isOpen.value = false;
+  } else if (e.key === 'Enter' && isOpen.value && filteredOptions.value.length > 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleSelect(filteredOptions.value[0].value);
+  }
+};
+
+const handlePaste = (e: ClipboardEvent) => {
+  const rawText = e.clipboardData?.getData('text');
+  if (!rawText) return;
+  const cleaned = rawText.replace(/[\r\n\t]+/g, ' ').trim();
+  if (cleaned !== rawText) {
+    e.preventDefault();
+    const input = e.target as HTMLInputElement;
+    const inserted = document.execCommand?.('insertText', false, cleaned);
+    if (inserted) {
+      searchQuery.value = input.value;
+    } else {
+      const start = input.selectionStart ?? 0;
+      const end = input.selectionEnd ?? 0;
+      const currentVal = input.value || '';
+      const nextVal = currentVal.slice(0, start) + cleaned + currentVal.slice(end);
+      input.value = nextVal;
+      input.setSelectionRange(start + cleaned.length, start + cleaned.length);
+      searchQuery.value = nextVal;
+    }
+  }
 };
 </script>
 
@@ -120,7 +153,9 @@ const handleClear = () => {
           :placeholder="placeholder || 'Search...'"
           :value="inputDisplayValue"
           @input="searchQuery = ($event.target as HTMLInputElement).value"
+          @paste="handlePaste"
           @focus="isOpen = true"
+          @keydown="handleInputKeydown"
           :disabled="disabled"
           :class="[
             'w-full bg-surface border rounded-lg text-text-main focus:outline-none transition-colors',

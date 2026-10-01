@@ -49,11 +49,25 @@ const vetoTypeOptions = computed((): SelectOption[] =>
 );
 
 const availableTeamsForLeft = computed((): SelectOption[] =>
-  teams.value.filter(t => t._id !== form.value.right.id).map(t => ({ value: t._id, label: t.name }))
+  [...teams.value]
+    .filter(t => t._id !== form.value.right.id)
+    .sort((a, b) => {
+      const nameA = String(a.name || '');
+      const nameB = String(b.name || '');
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    })
+    .map(t => ({ value: t._id, label: t.name }))
 );
 
 const availableTeamsForRight = computed((): SelectOption[] =>
-  teams.value.filter(t => t._id !== form.value.left.id).map(t => ({ value: t._id, label: t.name }))
+  [...teams.value]
+    .filter(t => t._id !== form.value.left.id)
+    .sort((a, b) => {
+      const nameA = String(a.name || '');
+      const nameB = String(b.name || '');
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    })
+    .map(t => ({ value: t._id, label: t.name }))
 );
 
 const vetoTeamsOptions = computed((): SelectOption[] => [

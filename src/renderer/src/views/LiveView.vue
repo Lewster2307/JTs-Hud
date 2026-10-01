@@ -13,6 +13,7 @@ const {
   ctPlayers,
   tPlayers,
   availableTeams,
+  dbPlayers,
   isModalOpen,
   isEditing,
   formData,
@@ -67,8 +68,9 @@ const {
       :is-open="isAddAllModalOpen"
       :side="addAllSide"
       :teams="availableTeams"
-      :player-count="addAllSide === 'CT' ? ctPlayers.length : tPlayers.length"
-      v-model:selected-team-id="selectedTeamForAddAll"
+      :gsi-players="addAllSide === 'CT' ? ctPlayers : tPlayers"
+      :db-players="dbPlayers"
+      :initial-team-id="selectedTeamForAddAll"
       :is-adding="isAddingAll"
       @close="isAddAllModalOpen = false"
       @confirm="handleAddAll"

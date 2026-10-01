@@ -1,36 +1,75 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTeams } from './useTeams'
-import { useTeamExcel } from '../../../composables/useExcel'
+import { usePlayers } from '../../players/composables/usePlayers'
 
 const TABLE_HEADERS = [
   { key: 'logo', label: 'Logo' },
   { key: 'name', label: 'Team Name', sortable: true },
   { key: 'shortName', label: 'Abbreviation', sortable: true },
-  { key: 'country', label: 'Country', sortable: true }
+  { key: 'country', label: 'Country', sortable: true },
+  { key: 'playerCount', label: 'Players', sortable: true }
 ]
 
 const getEmptyForm = () => ({ name: '', shortName: '', country: '', logo: '', extra: {} })
 
+const TEAMS_SORT_STORAGE_KEY = 'teams-table-sort'
+
 export function useTeamsView() {
   const { teams, isLoading, fetchTeams, saveTeam, deleteTeam, deleteManyTeams } = useTeams()
-  const { exportTeams, importTeams } = useTeamExcel(fetchTeams)
+  const { players, fetchPlayers } = usePlayers()
 
   // --- Sort ---
-  const sortKey = ref('name')
-  const sortDir = ref<'asc' | 'desc'>('asc')
+  const getInitialSort = () => {
+    try {
+      const saved = localStorage.getItem(TEAMS_SORT_STORAGE_KEY) || localStorage.getItem('teams-table-columns-sort')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && typeof parsed.key === 'string' && TABLE_HEADERS.some(h => h.key === parsed.key && h.sortable)) {
+          return {
+            key: parsed.key,
+            dir: (parsed.dir === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc'
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { key: 'name', dir: 'asc' as const }
+  }
+
+  const initialSort = getInitialSort()
+  const sortKey = ref(initialSort.key)
+  const sortDir = ref<'asc' | 'desc'>(initialSort.dir)
 
   const handleSort = ({ key, dir }: { key: string; dir: 'asc' | 'desc' }) => {
     sortKey.value = key
     sortDir.value = dir
+    try {
+      localStorage.setItem(TEAMS_SORT_STORAGE_KEY, JSON.stringify({ key, dir }))
+      localStorage.setItem('teams-table-columns-sort', JSON.stringify({ key, dir }))
+    } catch {
+      /* ignore */
+    }
   }
 
   const sortedTeams = computed(() => {
     const list = [...teams.value]
     const dir = sortDir.value === 'asc' ? 1 : -1
     return list.sort((a, b) => {
-      const aVal = (a[sortKey.value] ?? '').toLowerCase()
-      const bVal = (b[sortKey.value] ?? '').toLowerCase()
-      return aVal < bVal ? -dir : aVal > bVal ? dir : 0
+      if (sortKey.value === 'playerCount') {
+        const aCount = players.value.filter(p => p.team === a._id).length
+        const bCount = players.value.filter(p => p.team === b._id).length
+        if (aCount !== bCount) return (aCount - bCount) * dir
+      } else {
+        const aVal = String(a[sortKey.value] ?? '')
+        const bVal = String(b[sortKey.value] ?? '')
+        const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base', numeric: true })
+        if (cmp !== 0) return cmp * dir
+      }
+      // Tie breaker by team name
+      const aName = String(a.name ?? '')
+      const bName = String(b.name ?? '')
+      return aName.localeCompare(bName, undefined, { sensitivity: 'base', numeric: true })
     })
   })
 
@@ -76,11 +115,15 @@ export function useTeamsView() {
     isModalOpen.value = true
   }
 
-  onMounted(fetchTeams)
+  onMounted(() => {
+    fetchTeams()
+    fetchPlayers()
+  })
 
   return {
     // Data
     teams,
+    players,
     isLoading,
     sortedTeams,
     tableHeaders: TABLE_HEADERS,
@@ -100,9 +143,6 @@ export function useTeamsView() {
     handleSave,
     openCreateModal,
     openEditModal,
-    // Excel
-    exportTeams,
-    importTeams,
     // CRUD
     deleteTeam
   }

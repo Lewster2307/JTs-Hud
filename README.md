@@ -1,3 +1,40 @@
+# JTs Hud (Fork)
+
+> [!WARNING]
+> **AI-Assisted Fork Disclaimer:** This fork was developed completely with AI assistance. There are no guarantees for stability, data integrity, or ongoing maintenance. Use at your own risk.
+
+### Changes and Additions in this Fork
+
+#### Player & Team Management
+- **Dual Image Upload & Direct URL Download**: Adding or editing team logos and player avatars supports both local file selection and direct web image URLs. Users can toggle between "File" and "URL" mode to either browse files from disk or paste an image URL (e.g. from HLTV, Liquipedia, Steam CDN). Images from URLs are automatically fetched by the backend with proper browser headers and an offscreen Chromium fallback for Cloudflare-protected sites, validated, and saved into the local uploads directory. Includes an on-image delete button and automatic disk cleanup of replaced or removed image files.
+- **Mandatory Required Fields**: Enforces that players must have at least a non-empty username and teams must have at least a non-empty team name. Empty submissions are blocked both in the UI with inline validation errors and in the backend REST API with HTTP 400 responses.
+- **Unique Team Names & Usernames**: Team names and player usernames are enforced to be unique both during manual creation and when importing backups, preventing accidental duplicates.
+- **Bulk Team Assignment**: Selecting multiple players in the Players tab displays an "Add to Team" action in the bulk action bar alongside "Delete Selected". A modal allows searching and choosing any team (or "No Team" to unassign), updating all selected players at once.
+- **Team Roster Preview**: Editing a team displays a live list of all players currently assigned to that team, including avatars, Steam IDs, and coach status.
+- **Alphabetical Team Selectors**: Team dropdowns, player team assign selectors, and match creation Left/Right team selectors are all sorted alphabetically for quick searching and selection.
+- **Demo Player Sync & Steam ID Mapping**: When importing in-game players from a CS demo in the "Live Game Data" tab via "Add All to Team", a side-by-side reconciliation interface allows selecting a target team, connecting in-game demo players to hand-crafted team players in the database, and choosing exactly which data to pull (pull Steam ID, keep or overwrite username). Also supports creating brand new players directly with real-time duplicate username detection against the database and within the batch.
+- **Unassign Player Team**: Players can be set back to "No Team" directly from the team dropdown.
+
+#### Table & Navigation Enhancements
+- **Sticky Table Headers**: Tables (Teams, Players, Matches) keep their column headers pinned at the top while scrolling through rows, with opaque backgrounds and crisp border separation, making navigation and sorting effortless even with large page sizes.
+- **Persistent Table Sorting**: Tables remember which column and direction (`asc` / `desc`) you sorted by across reloads and app restarts. The Player Count column on the Teams table is also sortable.
+- **Customizable Table Columns**: The Teams and Players tables include a "Columns" dropdown to show or hide columns. Preferences persist in `localStorage`.
+- **New Table Columns**: Added Steam ID and Country columns to the Players table, and a Player Count column to the Teams table.
+- **Clickable Steam Community Profiles**: Clicking any player's Steam ID in the Players table directly opens their Steam Community profile in the default web browser (`http://steamcommunity.com/profiles/[STEAMID]`).
+- **Clickable HLTV Search Links**: Clicking any player's username in the Players table or any team's name in the Teams table directly opens their HLTV search results in the default web browser (`https://www.hltv.org/search?query=[QUERY]`).
+
+#### Backup, Import & Export
+- **Unified ZIP Backup & Restore**: Replaced separate Excel buttons with a dedicated "Import / Export" tab in the sidebar. Exports all teams and players simultaneously in a single `.zip` file, preserving team-player assignments and bundling all local logo and avatar image files. Imports enforce unique team names and player usernames, detect existing duplicates, and prompt the user to choose whether to overwrite or skip them.
+
+#### Application & Quality of Life
+- **Window State Persistence**: Remembers window dimensions, screen position, maximized state, and fullscreen mode across app restarts (stored in a local config file, with zero database changes).
+- **Default Rows Per Page Setting**: Configurable in Settings (10, 25, 50, 100), stored in `localStorage`, and applied automatically to table pagination throughout the app.
+- **Instant Paste Sanitization**: Automatically strips leading and trailing spaces, tabs, and newlines the second text is pasted into inputs (convenient for copy-pasting from HLTV). Steam IDs also have all whitespace stripped.
+- **Modal Keyboard Controls**: Pressing `ESC` closes modals without saving, and pressing `ENTER` submits/saves the form. `ESC` also closes the Settings modal.
+- **Required HUD Setup & Quick Console Commands**: Displays a setup banner in the HUDs tab explaining that the game must be in "Fullscreen Windowed" mode for the HUD overlay to appear in front of the game, along with recommended CS2 console commands formatted with semicolons and a one-click copy button.
+
+---
+<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 # JTs Hud (Formally OpenHud)
 
 A simple open-source Counter-Strike 2 Custom Hud and Hud manager. Manage overlays, players, teams, and matches. This project is passively updated, and community PRs are much appreciated!

@@ -1,14 +1,16 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePlayers } from './usePlayers'
 import { useTeams } from '../../teams/composables/useTeams'
-import { usePlayerExcel } from '../../../composables/useExcel'
+import { API_URL } from '../../../index'
 
 const TABLE_HEADERS = [
   { key: 'avatar', label: 'Photo' },
   { key: 'username', label: 'Username', sortable: true },
   { key: 'firstName', label: 'First Name', sortable: true },
   { key: 'lastName', label: 'Last Name', sortable: true },
-  { key: 'team', label: 'Team', sortable: true }
+  { key: 'team', label: 'Team', sortable: true },
+  { key: 'country', label: 'Country', sortable: true },
+  { key: 'steamid', label: 'Steam ID', sortable: true }
 ]
 
 const getEmptyForm = () => ({
@@ -23,6 +25,8 @@ const getEmptyForm = () => ({
   extra: {}
 })
 
+const PLAYERS_SORT_STORAGE_KEY = 'players-table-sort'
+
 export function usePlayersView() {
   const {
     players,
@@ -33,15 +37,39 @@ export function usePlayersView() {
     deleteManyPlayers
   } = usePlayers()
   const { teams: availableTeams, fetchTeams } = useTeams()
-  const { exportPlayers, importPlayers } = usePlayerExcel(fetchPlayers)
 
   // --- Sort ---
-  const sortKey = ref('username')
-  const sortDir = ref<'asc' | 'desc'>('asc')
+  const getInitialSort = () => {
+    try {
+      const saved = localStorage.getItem(PLAYERS_SORT_STORAGE_KEY) || localStorage.getItem('players-table-columns-sort')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && typeof parsed.key === 'string' && TABLE_HEADERS.some(h => h.key === parsed.key && h.sortable)) {
+          return {
+            key: parsed.key,
+            dir: (parsed.dir === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc'
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { key: 'username', dir: 'asc' as const }
+  }
+
+  const initialSort = getInitialSort()
+  const sortKey = ref(initialSort.key)
+  const sortDir = ref<'asc' | 'desc'>(initialSort.dir)
 
   const handleSort = ({ key, dir }: { key: string; dir: 'asc' | 'desc' }) => {
     sortKey.value = key
     sortDir.value = dir
+    try {
+      localStorage.setItem(PLAYERS_SORT_STORAGE_KEY, JSON.stringify({ key, dir }))
+      localStorage.setItem('players-table-columns-sort', JSON.stringify({ key, dir }))
+    } catch {
+      /* ignore */
+    }
   }
 
   // --- Team Resolution ---
@@ -64,11 +92,22 @@ export function usePlayersView() {
       if (sortKey.value === 'team') {
         aVal = getTeamName(a.team)
         bVal = getTeamName(b.team)
+
+        // Put players without a team at the bottom
+        if (!aVal && bVal) return 1
+        if (aVal && !bVal) return -1
       } else {
-        aVal = (a[sortKey.value] ?? '').toLowerCase()
-        bVal = (b[sortKey.value] ?? '').toLowerCase()
+        aVal = String(a[sortKey.value] ?? '')
+        bVal = String(b[sortKey.value] ?? '')
       }
-      return aVal < bVal ? -dir : aVal > bVal ? dir : 0
+
+      const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base', numeric: true })
+      if (cmp !== 0) return cmp * dir
+
+      // Secondary tie-breaker by username
+      const aUser = String(a.username ?? '')
+      const bUser = String(b.username ?? '')
+      return aUser.localeCompare(bUser, undefined, { sensitivity: 'base', numeric: true })
     })
   })
 
@@ -87,6 +126,46 @@ export function usePlayersView() {
   const handleDeleteAll = async () => {
     await deleteManyPlayers(players.value.map((p) => p._id))
     selectedPlayerIds.value = []
+  }
+
+  // --- Bulk Assign Team Modal ---
+  const isAssignTeamModalOpen = ref(false)
+  const selectedTeamForAssign = ref<string | null>(null)
+  const isAssigningTeam = ref(false)
+
+  const openAssignTeamModal = () => {
+    selectedTeamForAssign.value = null
+    isAssignTeamModalOpen.value = true
+  }
+
+  const handleAssignTeam = async () => {
+    if (!selectedPlayerIds.value.length || selectedTeamForAssign.value === null) return
+    isAssigningTeam.value = true
+    try {
+      const targetTeam = selectedTeamForAssign.value
+      for (const id of selectedPlayerIds.value) {
+        const player = players.value.find((p) => p._id === id)
+        if (player) {
+          const formData = new FormData()
+          const payload = { ...player, team: targetTeam }
+          Object.keys(payload).forEach((key) => {
+            const value = typeof payload[key] === 'object' ? JSON.stringify(payload[key]) : payload[key]
+            formData.append(key, value)
+          })
+          await fetch(`${API_URL}/players/${id}`, {
+            method: 'PUT',
+            body: formData
+          })
+        }
+      }
+      await fetchPlayers()
+      selectedPlayerIds.value = []
+      isAssignTeamModalOpen.value = false
+    } catch (error) {
+      console.error('Failed to assign team to players:', error)
+    } finally {
+      isAssigningTeam.value = false
+    }
   }
 
   // --- Modal ---
@@ -136,6 +215,12 @@ export function usePlayersView() {
     handleSelectionChange,
     handleDeleteSelected,
     handleDeleteAll,
+    // Bulk Assign Team
+    isAssignTeamModalOpen,
+    selectedTeamForAssign,
+    isAssigningTeam,
+    openAssignTeamModal,
+    handleAssignTeam,
     // Modal
     isModalOpen,
     isEditing,
@@ -143,9 +228,6 @@ export function usePlayersView() {
     handleSave,
     openCreateModal,
     openEditModal,
-    // Excel
-    exportPlayers,
-    importPlayers,
     // CRUD
     deletePlayer
   }

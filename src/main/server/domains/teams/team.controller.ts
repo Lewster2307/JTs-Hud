@@ -2,6 +2,7 @@ import path from 'path'
 import { Request, Response } from 'express'
 import { TeamService } from './team.service'
 import { uploadsPath, deleteUploadedFile } from '../../utils/multer'
+import { downloadImageFromUrl } from '../../utils/downloadImage'
 import { PlayerRepository } from '../players/player.repository'
 
 const teamService = new TeamService()
@@ -43,8 +44,19 @@ export const getTeamById = async (req: Request, res: Response) => {
 export const createTeam = async (req: Request, res: Response) => {
   try {
     const teamData = req.body
+    if (!teamData.name || typeof teamData.name !== 'string' || !teamData.name.trim()) {
+      res.status(400).json({ error: 'Team name is required' })
+      return
+    }
+    teamData.name = teamData.name.trim()
+    if (teamData.shortName && typeof teamData.shortName === 'string') {
+      teamData.shortName = teamData.shortName.trim()
+    }
+
     if (req.file) {
       teamData.logo = `/api/uploads/${req.file.filename}`
+    } else if (teamData.logo && (teamData.logo.startsWith('http://') || teamData.logo.startsWith('https://'))) {
+      teamData.logo = await downloadImageFromUrl(teamData.logo)
     }
     const team = await teamService.createTeam(teamData)
     res.status(201).json(team)
@@ -56,11 +68,31 @@ export const createTeam = async (req: Request, res: Response) => {
 export const updateTeam = async (req: Request, res: Response) => {
   try {
     const teamData = req.body
+    if (teamData.name !== undefined && (!teamData.name || typeof teamData.name !== 'string' || !teamData.name.trim())) {
+      res.status(400).json({ error: 'Team name cannot be empty' })
+      return
+    }
+    if (teamData.name && typeof teamData.name === 'string') {
+      teamData.name = teamData.name.trim()
+    }
+    if (teamData.shortName && typeof teamData.shortName === 'string') {
+      teamData.shortName = teamData.shortName.trim()
+    }
+
+    const existing = await teamService.getTeamById(req.params.id as string)
+
     if (req.file) {
       // New logo uploaded — delete the old one first
-      const existing = await teamService.getTeamById(req.params.id as string)
       if (existing?.logo) deleteUploadedFile(existing.logo)
       teamData.logo = `/api/uploads/${req.file.filename}`
+    } else if (teamData.logo && (teamData.logo.startsWith('http://') || teamData.logo.startsWith('https://'))) {
+      if (existing?.logo) deleteUploadedFile(existing.logo)
+      teamData.logo = await downloadImageFromUrl(teamData.logo)
+    } else if (teamData.logo === '' || teamData.logo === null) {
+      if (existing?.logo) deleteUploadedFile(existing.logo)
+      teamData.logo = ''
+    } else if (teamData.logo && existing?.logo && teamData.logo !== existing.logo) {
+      deleteUploadedFile(existing.logo)
     }
     const team = await teamService.updateTeam(req.params.id as string, teamData)
     if (!team) return res.status(404).json({ error: 'Team not found' })

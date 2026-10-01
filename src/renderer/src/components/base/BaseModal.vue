@@ -1,14 +1,48 @@
 <script setup lang="ts">
+import { watch, onUnmounted } from 'vue';
 import BaseButton from './BaseButton.vue';
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean;
   title: string;
   formId?: string; // ID of the form inside the slot to trigger submit
   maxWidthClass?: string;
 }>();
 
-defineEmits(['close', 'cancel']);
+const emit = defineEmits(['close', 'cancel']);
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (!props.isOpen) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    emit('close');
+  } else if (e.key === 'Enter') {
+    const target = e.target as HTMLElement | null;
+    if (target?.tagName === 'TEXTAREA') return;
+    if (target?.tagName === 'BUTTON' && target.getAttribute('type') !== 'submit') return;
+
+    if (props.formId) {
+      e.preventDefault();
+      const formEl = document.getElementById(props.formId) as HTMLFormElement | null;
+      if (formEl) {
+        formEl.requestSubmit();
+      }
+    }
+  }
+};
+
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', handleKeyDown);
+  } else {
+    window.removeEventListener('keydown', handleKeyDown);
+  }
+}, { immediate: true });
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <template>

@@ -90,34 +90,58 @@ export function useLiveView() {
 
   const openAddAllModal = (side: 'CT' | 'T') => {
     addAllSide.value = side
-    selectedTeamForAddAll.value = ''
+    const demoTeamName = side === 'CT'
+      ? (gameState.value?.map?.team_ct?.name || '')
+      : (gameState.value?.map?.team_t?.name || '')
+    if (demoTeamName) {
+      const match = availableTeams.value.find(
+        (t) => t.name.toLowerCase() === demoTeamName.toLowerCase() ||
+               (t.shortName && t.shortName.toLowerCase() === demoTeamName.toLowerCase())
+      )
+      selectedTeamForAddAll.value = match ? match._id : ''
+    } else {
+      selectedTeamForAddAll.value = ''
+    }
     isAddAllModalOpen.value = true
   }
 
-  const handleAddAll = async () => {
-    if (!selectedTeamForAddAll.value || !addAllSide.value) return
-    const playersToAdd = addAllSide.value === 'CT' ? ctPlayers.value : tPlayers.value
+  const handleAddAll = async (mappings: any[], teamId: string) => {
+    if (!teamId || !mappings || !mappings.length) return
     isAddingAll.value = true
     try {
-      for (const gsiPlayer of playersToAdd) {
-        const existingPlayer = dbPlayers.value.find((p) => p.steamid === gsiPlayer.steamid)
-        const payload = existingPlayer
-          ? { ...existingPlayer, username: gsiPlayer.name, team: selectedTeamForAddAll.value }
-          : {
-              firstName: '',
-              lastName: '',
-              username: gsiPlayer.name,
-              avatar: '',
-              country: '',
-              steamid: gsiPlayer.steamid,
-              team: selectedTeamForAddAll.value,
-              extra: {}
-            }
-        await savePlayer(payload, existingPlayer ? existingPlayer._id : null, null)
+      for (const m of mappings) {
+        if (m.action === 'skip') continue
+
+        if (m.action === 'existing' && m.targetPlayerId) {
+          const existingPlayer = dbPlayers.value.find((p) => p._id === m.targetPlayerId)
+          if (!existingPlayer) continue
+
+          const payload = {
+            ...existingPlayer,
+            team: teamId,
+            ...(m.pullSteamId ? { steamid: m.gsiPlayer.steamid } : {}),
+            ...(m.pullUsername && m.username ? { username: m.username.trim() } : {})
+          }
+          await savePlayer(payload, existingPlayer._id, null)
+        } else if (m.action === 'create') {
+          const payload = {
+            firstName: '',
+            lastName: '',
+            username: (m.username || m.gsiPlayer.name).trim(),
+            avatar: '',
+            country: '',
+            steamid: m.pullSteamId ? m.gsiPlayer.steamid : '',
+            team: teamId,
+            isCoach: m.isCoach || false,
+            extra: {}
+          }
+          await savePlayer(payload, null, null)
+        }
       }
       isAddAllModalOpen.value = false
+      await fetchPlayers()
     } catch (error) {
-      console.error('Failed to add all players:', error)
+      console.error('Failed to sync players to team:', error)
     } finally {
       isAddingAll.value = false
     }
@@ -150,6 +174,7 @@ export function useLiveView() {
     ctPlayers,
     tPlayers,
     availableTeams,
+    dbPlayers,
     // Player modal
     isModalOpen,
     isEditing,

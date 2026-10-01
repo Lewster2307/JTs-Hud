@@ -16,7 +16,9 @@ import teamRoutes from './domains/teams/team.routes'
 import createHudRouter from './domains/huds/hud.routes'
 import settingsRoutes from './domains/settings/settings.routes'
 import spectatorRoutes from './domains/spectator/spectator.routes'
-import { uploadsPath } from './utils/multer'
+import backupRoutes from './domains/backup/backup.routes'
+import { uploadsPath, deleteUploadedFile } from './utils/multer'
+import { downloadImageFromUrl } from './utils/downloadImage'
 import { getHudsDir, getBuiltinHudDir } from '../paths'
 import { signedHudMiddleware } from './middleware/signedHudMiddleware'
 
@@ -50,6 +52,30 @@ app.use(signedHudMiddleware)
 app.use('/huds/default', express.static(getBuiltinHudDir()))
 app.use('/huds', express.static(hudsPath))
 app.use('/api/uploads', express.static(uploadsPath))
+app.post('/api/uploads/from-url', async (req, res) => {
+  try {
+    const { url } = req.body
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid "url" in request body' })
+      return
+    }
+    const localPath = await downloadImageFromUrl(url)
+    res.json({ url: localPath })
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to download image from URL' })
+  }
+})
+app.delete('/api/uploads/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename as string
+    if (filename) {
+      deleteUploadedFile(filename)
+    }
+    res.json({ success: true })
+  } catch (error: any) {
+    res.status(500).json({ error: error.message })
+  }
+})
 
 app.use('/api/huds', createHudRouter(io))
 app.use('/api/teams', teamRoutes)
@@ -57,6 +83,7 @@ app.use('/api/players', playerRoutes)
 app.use('/api/match', createMatchRouter(io))
 app.use('/api/settings', settingsRoutes)
 app.use('/api/spectator', spectatorRoutes)
+app.use('/api/backup', backupRoutes)
 
 setupSockets(io)
 

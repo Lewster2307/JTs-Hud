@@ -5,16 +5,49 @@ export interface AppSettings {
   autoSwitchSides: boolean
 }
 
-export function useSettings() {
-  const settings = ref<AppSettings>({ autoSwitchSides: true })
-  const isLoading = ref(false)
-  const isSaving = ref(false)
+const DEFAULT_PAGE_SIZE_STORAGE_KEY = 'app-default-page-size'
 
-  const fetchSettings = async () => {
+const loadDefaultPageSize = (): number => {
+  try {
+    const saved = localStorage.getItem(DEFAULT_PAGE_SIZE_STORAGE_KEY)
+    if (saved) {
+      const n = Number(saved)
+      if ([10, 25, 50, 100].includes(n)) return n
+    }
+  } catch {
+    /* ignore */
+  }
+  return 10
+}
+
+const defaultPageSize = ref<number>(loadDefaultPageSize())
+
+const setDefaultPageSize = (size: number) => {
+  defaultPageSize.value = size
+  try {
+    localStorage.setItem(DEFAULT_PAGE_SIZE_STORAGE_KEY, String(size))
+  } catch {
+    /* ignore */
+  }
+}
+
+const settings = ref<AppSettings>({
+  autoSwitchSides: true
+})
+const isLoading = ref(false)
+const isSaving = ref(false)
+let fetched = false
+
+export function useSettings() {
+  const fetchSettings = async (force = false) => {
+    if (fetched && !force) return
     isLoading.value = true
     try {
       const res = await fetch(`${API_URL}/settings`)
-      if (res.ok) settings.value = await res.json()
+      if (res.ok) {
+        settings.value = await res.json()
+        fetched = true
+      }
     } catch (err) {
       console.error('Failed to fetch settings:', err)
     } finally {
@@ -38,5 +71,13 @@ export function useSettings() {
     }
   }
 
-  return { settings, isLoading, isSaving, fetchSettings, saveSettings }
+  return {
+    settings,
+    defaultPageSize,
+    setDefaultPageSize,
+    isLoading,
+    isSaving,
+    fetchSettings,
+    saveSettings
+  }
 }

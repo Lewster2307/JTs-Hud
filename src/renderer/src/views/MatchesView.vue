@@ -16,7 +16,7 @@ const baseUrl = API_URL.replace('/api', '');
 </script>
 
 <template>
-  <div class="p-6 bg-surface text-zinc-200 min-h-screen relative">
+  <div class="p-6 bg-surface text-zinc-200 min-h-full relative">
     <MatchesPageHeader @create="openCreate" />
 
     <BaseTable
