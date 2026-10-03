@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, screen } from 'electron'
+import { app, BrowserWindow, shell, screen, Rectangle } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import { is } from '@electron-toolkit/utils'
@@ -11,6 +11,7 @@ interface WindowState {
   y?: number
   isMaximized: boolean
   isFullScreen: boolean
+  displayBounds?: Rectangle
 }
 
 const DEFAULT_WIDTH = 1280
@@ -26,13 +27,28 @@ function loadWindowState(): WindowState {
     if (fs.existsSync(filePath)) {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
       if (typeof data.width === 'number' && typeof data.height === 'number') {
+        const displayBounds =
+          data.displayBounds &&
+          typeof data.displayBounds.x === 'number' &&
+          typeof data.displayBounds.y === 'number' &&
+          typeof data.displayBounds.width === 'number' &&
+          typeof data.displayBounds.height === 'number'
+            ? {
+                x: data.displayBounds.x,
+                y: data.displayBounds.y,
+                width: data.displayBounds.width,
+                height: data.displayBounds.height
+              }
+            : undefined
+
         return {
           width: Math.max(DEFAULT_WIDTH, data.width),
           height: Math.max(DEFAULT_HEIGHT, data.height),
           x: typeof data.x === 'number' ? data.x : undefined,
           y: typeof data.y === 'number' ? data.y : undefined,
           isMaximized: Boolean(data.isMaximized),
-          isFullScreen: Boolean(data.isFullScreen)
+          isFullScreen: Boolean(data.isFullScreen),
+          displayBounds
         }
       }
     }
@@ -57,18 +73,64 @@ function isPositionOnAnyDisplay(x: number, y: number): boolean {
 
 export function createWindow(): void {
   const savedState = loadWindowState()
+  const allDisplays = screen.getAllDisplays()
+
+  let targetDisplay: Electron.Display | undefined
+
+  if (savedState.displayBounds) {
+    targetDisplay = allDisplays.find(
+      (d) =>
+        d.bounds.x === savedState.displayBounds?.x &&
+        d.bounds.y === savedState.displayBounds?.y &&
+        d.bounds.width === savedState.displayBounds?.width &&
+        d.bounds.height === savedState.displayBounds?.height
+    )
+  }
+
+  if (!targetDisplay && typeof savedState.x === 'number' && typeof savedState.y === 'number') {
+    targetDisplay = screen.getDisplayMatching({
+      x: savedState.x,
+      y: savedState.y,
+      width: savedState.width,
+      height: savedState.height
+    })
+  }
+
+  if (!targetDisplay) {
+    targetDisplay = screen.getPrimaryDisplay()
+  }
 
   const hasValidPosition =
     typeof savedState.x === 'number' &&
     typeof savedState.y === 'number' &&
     isPositionOnAnyDisplay(savedState.x, savedState.y)
 
+  let initialX: number
+  let initialY: number
+  let initialWidth = savedState.width
+  let initialHeight = savedState.height
+
+  if (savedState.isFullScreen) {
+    initialX = targetDisplay.bounds.x
+    initialY = targetDisplay.bounds.y
+    initialWidth = targetDisplay.bounds.width
+    initialHeight = targetDisplay.bounds.height
+  } else if (hasValidPosition) {
+    initialX = savedState.x!
+    initialY = savedState.y!
+  } else {
+    initialX = targetDisplay.bounds.x + Math.max(0, Math.round((targetDisplay.bounds.width - initialWidth) / 2))
+    initialY = targetDisplay.bounds.y + Math.max(0, Math.round((targetDisplay.bounds.height - initialHeight) / 2))
+  }
+
   const mainWindow = new BrowserWindow({
+    title: 'JTs Hud Manager - Lewster2307s fork',
     minWidth: DEFAULT_WIDTH,
     minHeight: DEFAULT_HEIGHT,
-    width: savedState.width,
-    height: savedState.height,
-    ...(hasValidPosition ? { x: savedState.x, y: savedState.y } : {}),
+    width: initialWidth,
+    height: initialHeight,
+    x: initialX,
+    y: initialY,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -78,14 +140,21 @@ export function createWindow(): void {
     }
   })
 
-  // Restore maximized or fullscreen state
+  // Explicitly position the window on the target display before entering fullscreen / maximize
   if (savedState.isFullScreen) {
+    mainWindow.setBounds(targetDisplay.bounds)
     mainWindow.setFullScreen(true)
   } else if (savedState.isMaximized) {
     mainWindow.maximize()
   }
 
   mainWindow.on('ready-to-show', () => {
+    if (savedState.isFullScreen) {
+      mainWindow.setBounds(targetDisplay.bounds)
+      if (!mainWindow.isFullScreen()) {
+        mainWindow.setFullScreen(true)
+      }
+    }
     mainWindow.show()
   })
 
@@ -98,13 +167,41 @@ export function createWindow(): void {
       const isFS = mainWindow.isFullScreen()
 
       const currentBounds = mainWindow.getBounds()
+      const currentDisplay = screen.getDisplayMatching(currentBounds)
+
+      let normalWidth = savedState.width
+      let normalHeight = savedState.height
+      let normalX = savedState.x
+      let normalY = savedState.y
+
+      if (!isMax && !isFS) {
+        normalWidth = currentBounds.width
+        normalHeight = currentBounds.height
+        normalX = currentBounds.x
+        normalY = currentBounds.y
+      } else {
+        const isNormalOnDisplay =
+          typeof normalX === 'number' &&
+          typeof normalY === 'number' &&
+          normalX >= currentDisplay.bounds.x &&
+          normalX < currentDisplay.bounds.x + currentDisplay.bounds.width &&
+          normalY >= currentDisplay.bounds.y &&
+          normalY < currentDisplay.bounds.y + currentDisplay.bounds.height
+
+        if (!isNormalOnDisplay) {
+          normalX = currentDisplay.bounds.x + Math.max(0, Math.round((currentDisplay.bounds.width - normalWidth) / 2))
+          normalY = currentDisplay.bounds.y + Math.max(0, Math.round((currentDisplay.bounds.height - normalHeight) / 2))
+        }
+      }
+
       const stateToSave: WindowState = {
-        width: !isMax && !isFS ? currentBounds.width : savedState.width,
-        height: !isMax && !isFS ? currentBounds.height : savedState.height,
-        x: !isMax && !isFS ? currentBounds.x : savedState.x,
-        y: !isMax && !isFS ? currentBounds.y : savedState.y,
+        width: normalWidth,
+        height: normalHeight,
+        x: normalX,
+        y: normalY,
         isMaximized: isMax,
-        isFullScreen: isFS
+        isFullScreen: isFS,
+        displayBounds: currentDisplay.bounds
       }
 
       savedState.width = stateToSave.width
@@ -113,6 +210,7 @@ export function createWindow(): void {
       savedState.y = stateToSave.y
       savedState.isMaximized = isMax
       savedState.isFullScreen = isFS
+      savedState.displayBounds = stateToSave.displayBounds
 
       fs.writeFileSync(getStateFilePath(), JSON.stringify(stateToSave, null, 2), 'utf-8')
     } catch {

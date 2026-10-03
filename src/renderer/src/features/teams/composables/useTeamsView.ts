@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTeams } from './useTeams'
 import { usePlayers } from '../../players/composables/usePlayers'
+import { getCountry } from '../../../utils/countries'
 
 const TABLE_HEADERS = [
   { key: 'logo', label: 'Logo' },
@@ -53,12 +54,16 @@ export function useTeamsView() {
   }
 
   const sortedTeams = computed(() => {
-    const list = [...teams.value]
+    const list = teams.value.map((t) => ({
+      ...t,
+      countryName: getCountry(t.country),
+      playerCount: players.value.filter((p) => p.team === t._id).length
+    }))
     const dir = sortDir.value === 'asc' ? 1 : -1
     return list.sort((a, b) => {
       if (sortKey.value === 'playerCount') {
-        const aCount = players.value.filter(p => p.team === a._id).length
-        const bCount = players.value.filter(p => p.team === b._id).length
+        const aCount = a.playerCount
+        const bCount = b.playerCount
         if (aCount !== bCount) return (aCount - bCount) * dir
       } else {
         const aVal = String(a[sortKey.value] ?? '')

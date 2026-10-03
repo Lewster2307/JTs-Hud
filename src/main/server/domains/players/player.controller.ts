@@ -60,7 +60,13 @@ export const createPlayer = async (req: Request, res: Response) => {
     syncCoaches()
     res.status(201).json(player)
   } catch (error: any) {
-    res.status(400).json({ error: error.message })
+    let msg = error.message
+    if (msg && msg.includes('players.steamid')) {
+      msg = 'A player with this Steam ID already exists'
+    } else if (msg && msg.includes('players.username')) {
+      msg = 'A player with this username already exists'
+    }
+    res.status(400).json({ error: msg })
   }
 }
 
@@ -100,7 +106,13 @@ export const updatePlayer = async (req: Request, res: Response) => {
     res.json(player)
     return
   } catch (error: any) {
-    res.status(400).json({ error: error.message })
+    let msg = error.message
+    if (msg && msg.includes('players.steamid')) {
+      msg = 'A player with this Steam ID already exists'
+    } else if (msg && msg.includes('players.username')) {
+      msg = 'A player with this username already exists'
+    }
+    res.status(400).json({ error: msg })
     return
   }
 }

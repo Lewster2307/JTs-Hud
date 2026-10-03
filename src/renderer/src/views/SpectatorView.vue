@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useSpectator } from '../features/spectator/composables/useSpectator';
 import SpectatorInfoModal from '../features/spectator/components/SpectatorInfoModal.vue';
 import SpectatorTelnetSettings from '../features/spectator/components/SpectatorTelnetSettings.vue';
@@ -10,6 +11,8 @@ import InfoIcon from '@renderer/assets/icons/InfoIcon.vue';
 import SettingsIcon from '@renderer/assets/icons/SettingsIcon.vue';
 import CloseIcon from '@renderer/assets/icons/CloseIcon.vue';
 import RefreshIcon from '@renderer/assets/icons/RefreshIcon.vue';
+import CopyIcon from '@renderer/assets/icons/CopyIcon.vue';
+import CheckIcon from '@renderer/assets/icons/CheckIcon.vue';
 import BaseButton from '@renderer/components/base/BaseButton.vue';
 import BaseBadge from '@renderer/components/base/BaseBadge.vue';
 import BaseInput from '@renderer/components/base/BaseInput.vue';
@@ -45,6 +48,29 @@ const {
   SLOT_KEYS,
   buildCommand
 } = useSpectator();
+
+const resetCopied = ref(false);
+const resetBindsCommand =
+  'spec_usenumberkeys_nobinds true; unbind 1; unbind 2; unbind 3; unbind 4; unbind 5; unbind 6; unbind 7; unbind 8; unbind 9; unbind 0; bind "1" "slot1"; bind "2" "slot2"; bind "3" "slot3"; bind "4" "slot4"; bind "5" "slot5"; bind "6" "slot6"; bind "7" "slot7"; bind "8" "slot8"; bind "9" "slot9"; bind "0" "slot10"';
+
+const copyResetBinds = async () => {
+  try {
+    await navigator.clipboard.writeText(resetBindsCommand);
+    resetCopied.value = true;
+    applyResult.value = {
+      ok: true,
+      message: 'Reset binds command copied to clipboard! Paste into CS2 console (~).'
+    };
+    setTimeout(() => {
+      resetCopied.value = false;
+    }, 2000);
+    setTimeout(() => {
+      applyResult.value = null;
+    }, 4000);
+  } catch (err) {
+    console.error('Failed to copy reset binds:', err);
+  }
+};
 </script>
 
 <template>
@@ -81,6 +107,17 @@ const {
         >
           <SettingsIcon/>
           Telnet
+        </BaseButton>
+
+        <!-- Reset binds copy button -->
+        <BaseButton
+          @click="copyResetBinds"
+          :variant="resetCopied ? 'primary' : 'secondary'"
+          title="Copy reset binds command to clipboard (for CS2 console)"
+        >
+          <CheckIcon v-if="resetCopied" class="w-4 h-4" />
+          <CopyIcon v-else class="w-4 h-4" />
+          {{ resetCopied ? 'Copied!' : 'Reset Binds' }}
         </BaseButton>
 
         <!-- Clear binds button -->

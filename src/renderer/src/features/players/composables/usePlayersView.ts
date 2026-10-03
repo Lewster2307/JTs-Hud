@@ -2,6 +2,7 @@ import { ref, computed, onMounted } from 'vue'
 import { usePlayers } from './usePlayers'
 import { useTeams } from '../../teams/composables/useTeams'
 import { API_URL } from '../../../index'
+import { getCountry } from '../../../utils/countries'
 
 const TABLE_HEADERS = [
   { key: 'avatar', label: 'Photo' },
@@ -84,14 +85,22 @@ export function usePlayersView() {
 
   // --- Sorted Players ---
   const sortedPlayers = computed(() => {
-    const list = [...players.value]
+    const list = players.value.map((p) => {
+      const t = teamMap.value[p.team]
+      return {
+        ...p,
+        teamName: getTeamName(p.team),
+        teamShortName: t?.shortName ?? '',
+        countryName: getCountry(p.country)
+      }
+    })
     const dir = sortDir.value === 'asc' ? 1 : -1
     return list.sort((a, b) => {
       let aVal = ''
       let bVal = ''
       if (sortKey.value === 'team') {
-        aVal = getTeamName(a.team)
-        bVal = getTeamName(b.team)
+        aVal = a.teamName
+        bVal = b.teamName
 
         // Put players without a team at the bottom
         if (!aVal && bVal) return 1

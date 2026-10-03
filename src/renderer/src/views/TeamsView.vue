@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BaseModal from '../components/base/BaseModal.vue';
 import BaseTable from '../components/base/BaseTable.vue';
+import BaseBadge from '../components/base/BaseBadge.vue';
 import TeamForm from '../features/teams/components/TeamForm.vue';
 import TeamsPageHeader from '../features/teams/components/TeamsPageHeader.vue';
 import TeamsBulkBar from '../features/teams/components/TeamsBulkBar.vue';
@@ -89,7 +90,7 @@ const openHltvSearch = (name: string) => {
       </template>
 
       <template #cell-country="{ item }">
-        <span v-if="item.country" class="text-xs text-zinc-300 font-medium">{{ item.country }}</span>
+        <BaseBadge v-if="item.country">{{ item.country }}</BaseBadge>
         <span v-else class="text-zinc-600 text-xs italic">—</span>
       </template>
 

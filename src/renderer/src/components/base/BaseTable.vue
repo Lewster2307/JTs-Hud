@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import BaseButton from './BaseButton.vue';
 import { useSettings } from '../../features/settings/composables/useSettings';
+import { getCountry } from '../../utils/countries';
 
 const props = withDefaults(defineProps<{
   headers: { key: string; label: string; sortable?: boolean }[];
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<{
   defaultPageSize?: number;
   searchPlaceholder?: string;
   searchable?: boolean;
+  searchFields?: string[];
   columnToggle?: boolean;
   storageKey?: string;
   stickyHeader?: boolean;
@@ -23,6 +25,7 @@ const props = withDefaults(defineProps<{
   sortDir: 'asc',
   searchPlaceholder: 'Search...',
   searchable: true,
+  searchFields: () => ['teamName', 'teamShortName'],
   columnToggle: false,
   stickyHeader: true,
   maxHeight: 'calc(100vh - 280px)'
@@ -65,13 +68,25 @@ const handleSearchPaste = (e: ClipboardEvent) => {
 const filteredItems = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return props.items;
-  const keys = props.headers.map(h => h.key);
-  return props.items.filter(item =>
-    keys.some(key => {
+  const headerKeys = props.headers.map((h) => h.key);
+  const extraKeys = props.searchFields || [];
+  const searchKeys = [...new Set([...headerKeys, ...extraKeys, 'countryName', 'teamName', 'teamShortName'])];
+  return props.items.filter((item) => {
+    const matchKey = searchKeys.some((key) => {
       const val = item[key];
       return val != null && String(val).toLowerCase().includes(q);
-    })
-  );
+    });
+    if (matchKey) return true;
+
+    if (item.country) {
+      const cName = item.countryName || getCountry(item.country);
+      if (cName && String(cName).toLowerCase().includes(q)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
 });
 
 // --- PAGINATION ---

@@ -37,7 +37,10 @@ export function usePlayers() {
         body: formData
       })
 
-      if (!res.ok) throw new Error('Failed to save player')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to save player')
+      }
       await fetchPlayers()
       return await res.json()
     } catch (error) {

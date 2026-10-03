@@ -9,7 +9,7 @@ import CheckIcon from '@renderer/assets/icons/CheckIcon.vue';
 
 const { huds, isLoading, fetchHuds, deleteHud, importing, importError, handleZipImport } = useHudsView();
 
-const singleLineCommands = 'cl_draw_only_deathnotices 1; cl_drawhud_force_teamid_overhead 1; cl_trueview_show_status 0; cl_demo_predict 0; engine_no_focus_sleep 0';
+const singleLineCommands = 'cl_draw_only_deathnotices 1; cl_drawhud_force_teamid_overhead 1; cl_trueview_show_status 0; r_show_build_info 0; cl_demo_predict 0; engine_no_focus_sleep 0; snd_mute_losefocus 0';
 
 const isCopied = ref(false);
 
@@ -75,8 +75,11 @@ const copyCommands = async () => {
         >cl_draw_only_deathnotices 1;
 cl_drawhud_force_teamid_overhead 1;
 cl_trueview_show_status 0;
+r_show_build_info 0;
 cl_demo_predict 0;
-engine_no_focus_sleep 0</pre>
+engine_no_focus_sleep 0;
+snd_mute_losefocus 0
+</pre>
       </div>
     </div>
 

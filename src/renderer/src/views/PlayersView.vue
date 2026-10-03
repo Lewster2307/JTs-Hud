@@ -58,6 +58,7 @@ const openHltvSearch = (username: string) => {
       :is-loading="isPlayersLoading"
       :selectable="true"
       :column-toggle="true"
+      :search-fields="['teamName', 'teamShortName']"
       storage-key="players-table-columns"
       :sort-key="sortKey"
       :sort-dir="sortDir"
@@ -93,7 +94,6 @@ const openHltvSearch = (username: string) => {
             </svg>
           </button>
           <BaseBadge v-if="item.isCoach" variant="red">Coach</BaseBadge>
-          <BaseBadge v-if="item.country">{{ item.country }}</BaseBadge>
         </div>
       </template>
 

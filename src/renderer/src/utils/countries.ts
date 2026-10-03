@@ -1,9 +1,11 @@
 export const countries: Record<string, string> = {
   AF: 'Afghanistan',
+  AFR: 'Africa',
   AX: 'Aland Islands',
   AL: 'Albania',
   DZ: 'Algeria',
   AS: 'American Samoa',
+  ASIA: 'Asia',
   AD: 'Andorra',
   AO: 'Angola',
   AI: 'Anguilla',
@@ -56,7 +58,7 @@ export const countries: Record<string, string> = {
   CI: "Cote D'Ivoire",
   HR: 'Croatia',
   CU: 'Cuba',
-  EU: 'European Union',
+  EU: 'Europe',
   CY: 'Cyprus',
   CZ: 'Czech Republic',
   DK: 'Denmark',
@@ -147,12 +149,14 @@ export const countries: Record<string, string> = {
   MD: 'Moldova',
   MC: 'Monaco',
   MN: 'Mongolia',
-  ME: 'Montenegro',
+  ME: 'Middle East',
+  MNE: 'Montenegro',
   MS: 'Montserrat',
   MA: 'Morocco',
   MZ: 'Mozambique',
   MM: 'Myanmar',
-  NA: 'Namibia',
+  NA: 'North America',
+  NAM: 'Namibia',
   NR: 'Nauru',
   NP: 'Nepal',
   NL: 'Netherlands',
@@ -194,7 +198,8 @@ export const countries: Record<string, string> = {
   WS: 'Samoa',
   SM: 'San Marino',
   ST: 'Sao Tome and Principe',
-  SA: 'Saudi Arabia',
+  KSA: 'Saudi Arabia',
+  SA: 'South America',
   SN: 'Senegal',
   RS: 'Serbia',
   SC: 'Seychelles',
@@ -251,13 +256,18 @@ export const countries: Record<string, string> = {
   YE: 'Yemen',
   ZM: 'Zambia',
   ZW: 'Zimbabwe',
-  XK: 'Kosovo'
+  XK: 'Kosovo',
+  WORLD: 'World'
 }
 
 export const countryOptions = Object.entries(countries)
   .map(([code, name]) => ({ code, name }))
   .sort((a, b) => a.name.localeCompare(b.name))
 
-export const getCountry = (iso: string) => {
-  return countries[iso.toUpperCase()]
-}
+export const getCountry = (iso?: string | null): string => {
+  if (!iso || typeof iso !== 'string') return '';
+  const upper = iso.toUpperCase();
+  if (upper === 'SAU') return countries['KSA'] || '';
+  if (upper === 'INT') return countries['WORLD'] || '';
+  return countries[upper] || '';
+};

@@ -62,6 +62,22 @@ const usernameError = computed(() => {
   return isDuplicate ? 'A player with this username already exists' : undefined;
 });
 
+const steamIdError = computed(() => {
+  const raw = form.value.steamid;
+  const sid = typeof raw === 'string' ? raw.trim().replace(/\s+/g, '') : '';
+  if (!sid) {
+    return undefined;
+  }
+  const currentId = props.initialData?._id;
+  const isDuplicate = props.existingPlayers.some(
+    (p: any) =>
+      p._id !== currentId &&
+      typeof p.steamid === 'string' &&
+      p.steamid.trim().replace(/\s+/g, '') === sid
+  );
+  return isDuplicate ? 'A player with this Steam ID already exists' : undefined;
+});
+
 watch(() => props.initialData, (newData) => {
   form.value = { ...newData };
   avatarPreview.value = null;
@@ -172,7 +188,7 @@ watch(() => form.value.steamid, (val) => {
 const handleSubmit = async () => {
   isSubmitted.value = true;
   const username = typeof form.value.username === 'string' ? form.value.username.trim() : '';
-  if (!username || usernameError.value) return;
+  if (!username || usernameError.value || steamIdError.value) return;
 
   if (imageSource.value === 'url' && imageUrlInput.value.trim() && !urlSuccess.value) {
     await downloadFromUrl();
@@ -260,6 +276,7 @@ const handleSubmit = async () => {
           label="Steam ID 64"
           type="text"
           :disabled="lockSteamId"
+          :error="steamIdError"
           size="md"
         />
         <BaseInput

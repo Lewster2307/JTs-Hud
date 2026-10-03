@@ -88,6 +88,7 @@ const {
         :teams="availableTeams"
         :is-editing="isEditing"
         :lock-steam-id="true"
+        :existing-players="dbPlayers"
         @submit="handleSave"
       />
     </BaseModal>
