@@ -39,6 +39,14 @@ function decodeHtml(s: string): string {
 
 function parsePlayerHtml(html: string): RawScrapedPlayerData | null {
   if (
+    html &&
+    html.includes('404') &&
+    (html.includes('Page not found') || html.includes('not found') || html.includes('Page does not exist'))
+  ) {
+    throw new Error('This player does not exist on HLTV (404 Not Found). Please verify the URL.')
+  }
+
+  if (
     !html ||
     html.includes('challenge-platform') ||
     html.includes('Just a moment') ||
@@ -190,7 +198,7 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
       isDone = true
       cleanup()
       reject(new Error('HLTV request timed out. Please check the URL and try again.'))
-    }, 30000)
+    }, 15000)
 
     win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
       if (isDone || !isMainFrame || errorCode === -3) return
@@ -199,18 +207,18 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
       reject(new Error(`Failed to load HLTV player page: ${errorDescription} (${errorCode})`))
     })
 
+    win.webContents.on('did-navigate', (_event, _url, httpResponseCode) => {
+      if (httpResponseCode === 404 || httpResponseCode === 410) {
+        if (isDone) return
+        isDone = true
+        cleanup()
+        reject(new Error('This player does not exist on HLTV (404 Not Found). Please verify the URL.'))
+      }
+    })
+
     const checkPage = async () => {
       if (isDone || !win || win.isDestroyed()) return
       elapsedMs += 1000
-
-      if (elapsedMs >= 4000 && win && !win.isVisible()) {
-        try {
-          win.show()
-          win.focus()
-        } catch {
-          /* ignore */
-        }
-      }
 
       try {
         const title = (win.webContents.getTitle() || '').toLowerCase()
@@ -224,8 +232,27 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
           return // Still on Cloudflare challenge screen
         }
 
+        if (title.includes('404') || title.includes('not found') || title.includes('page not found')) {
+          if (isDone) return
+          isDone = true
+          cleanup()
+          reject(new Error('This player does not exist on HLTV (404 Not Found). Please verify the URL.'))
+          return
+        }
+
         const extracted = await win.webContents.executeJavaScript(`
           (() => {
+            const bodyText = (document.body ? document.body.innerText : '').toLowerCase();
+            if (
+              bodyText.includes('page not found') ||
+              bodyText.includes('page does not exist') ||
+              bodyText.includes('404 - not found') ||
+              bodyText.includes('error 404') ||
+              (bodyText.includes('404') && bodyText.includes('not found'))
+            ) {
+              return { notFound: true };
+            }
+
             function getByXPath(xpath) {
               try {
                 const res = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -350,6 +377,14 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
             };
           })()
         `)
+
+        if (extracted && (extracted as any).notFound) {
+          if (isDone) return
+          isDone = true
+          cleanup()
+          reject(new Error('This player does not exist on HLTV (404 Not Found). Please verify the URL.'))
+          return
+        }
 
         if (extracted && extracted.username) {
           isDone = true
