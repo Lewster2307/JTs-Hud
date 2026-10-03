@@ -54,8 +54,18 @@ const handleHltvExtractSuccess = async (extracted: any) => {
 
   let matchedTeamId = '';
   let warning = '';
-  if (extracted.team) {
-    const clean = String(extracted.team).trim().toLowerCase();
+  const rawTeam = String(extracted.team || '').trim();
+  const lowerRaw = rawTeam.toLowerCase();
+  const isNoTeam =
+    !rawTeam ||
+    rawTeam === '-' ||
+    lowerRaw === 'n/a' ||
+    lowerRaw === 'none' ||
+    lowerRaw === 'no team' ||
+    lowerRaw.includes('no team');
+
+  if (rawTeam && !isNoTeam) {
+    const clean = lowerRaw;
     const stripped = clean
       .replace(/^team\s+/, '')
       .replace(/\s+clan$/, '')
@@ -98,7 +108,7 @@ const handleHltvExtractSuccess = async (extracted: any) => {
     team: matchedTeamId,
     avatar: extracted.avatar || '',
     isCoach: false,
-    steamid: '',
+    steamid: extracted.steamid || '',
     extra: {}
   };
 

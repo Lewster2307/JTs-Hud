@@ -1,6 +1,8 @@
 // src/main/server/domains/players/hltv.scraper.ts
 import { BrowserWindow } from 'electron'
 import { execFile } from 'child_process'
+import https from 'https'
+import zlib from 'zlib'
 import { downloadImageFromUrl } from '../../utils/downloadImage'
 import { resolveCountryCode } from '../../utils/countries'
 
@@ -13,6 +15,7 @@ export interface HltvScrapedPlayer {
   team: string
   avatar: string
   avatarUrl: string
+  steamid: string
 }
 
 export interface RawScrapedPlayerData {
@@ -53,20 +56,34 @@ function parsePlayerHtml(html: string): RawScrapedPlayerData | null {
   const countryAlt = (flagImg.match(/alt="([^"]+)"/i) || [])[1] || ''
   const countrySrc = (flagImg.match(/src="([^"]+)"/i) || [])[1] || ''
 
-  // Team extraction
+  // Team extraction: only inspect the Team row in player profile
   let team = ''
-  const teamLinkMatch =
-    html.match(/<a[^>]*href="\/team\/[^"]*"[^>]*>([\s\S]*?)<\/a>/i) ||
-    html.match(/<div[^>]*class="[^"]*playerTeam[^"]*"[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+  const teamRowMatch =
+    html.match(/<span[^>]*>\s*Team\s*<\/span>[\s\S]*?<span[^>]*class="[^"]*listRight[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
+    html.match(/<div[^>]*class="[^"]*playerTeam[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
 
-  if (teamLinkMatch && teamLinkMatch[1]) {
-    team = decodeHtml(teamLinkMatch[1].replace(/<[^>]+>/g, '').trim())
-  }
-  if (!team) {
-    const rowMatch = html.match(/<span[^>]*>\s*Team\s*<\/span>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
-    if (rowMatch && rowMatch[1]) {
-      team = decodeHtml(rowMatch[1].replace(/<[^>]+>/g, '').trim())
+  if (teamRowMatch && teamRowMatch[1]) {
+    const teamContent = teamRowMatch[1]
+    const linkMatch =
+      teamContent.match(/<a[^>]*href="\/team\/[^"]*"[^>]*>([\s\S]*?)<\/a>/i) ||
+      teamContent.match(/<a[^>]*>([\s\S]*?)<\/a>/i)
+    if (linkMatch && linkMatch[1]) {
+      team = decodeHtml(linkMatch[1].replace(/<[^>]+>/g, '').trim())
+    } else {
+      team = decodeHtml(teamContent.replace(/<[^>]+>/g, '').trim())
     }
+  }
+
+  const cleanLower = team.toLowerCase().trim()
+  if (
+    !team ||
+    cleanLower === '-' ||
+    cleanLower === 'n/a' ||
+    cleanLower === 'none' ||
+    cleanLower === 'no team' ||
+    cleanLower.includes('no team')
+  ) {
+    team = ''
   }
 
   // Extract transparent avatar image from bodyshot wrapper
@@ -264,36 +281,49 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
               ? (countryEl.getAttribute('src') || countryEl.src || '')
               : '';
 
-            // 4. Team: /html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]/span[2]/span/a
-            const teamEl =
-              getByXPath('/html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]/span[2]/span/a') ||
-              getByXPath('/html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]//a') ||
-              document.querySelector('.playerTeam a') ||
-              document.querySelector('.player-team a');
+            // 4. Team:
+            // Check the exact container: /html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]/span[2]/span
+            const teamContainer =
+              getByXPath('/html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]/span[2]/span') ||
+              getByXPath('/html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]/span[2]') ||
+              getByXPath('/html/body/div[3]/div[6]/div[2]/div[1]/div[2]/div[1]/div[3]/div[2]/div[2]') ||
+              document.querySelector('.playerTeam') ||
+              document.querySelector('.player-team');
 
             let team = '';
-            if (teamEl) {
-              team = (teamEl.textContent || '').trim();
+            if (teamContainer) {
+              const link = teamContainer.querySelector('a[href*="/team/"]') || teamContainer.querySelector('a');
+              if (link) {
+                team = (link.textContent || '').trim();
+              } else {
+                team = (teamContainer.textContent || '').trim();
+              }
             }
+
             if (!team) {
+              // Try finding the row specifically labeled "Team"
               const allSpans = Array.from(document.querySelectorAll('span, div'));
               const teamLabel = allSpans.find(
                 s => s.children.length === 0 && s.textContent.trim().toLowerCase() === 'team'
               );
               if (teamLabel && teamLabel.parentElement) {
-                const link = teamLabel.parentElement.querySelector('a[href*="/team/"]');
-                if (link) {
-                  team = (link.textContent || '').trim();
+                const rightSide = teamLabel.parentElement.querySelector('.listRight, span:last-child');
+                if (rightSide) {
+                  const link = rightSide.querySelector('a');
+                  team = link ? (link.textContent || '').trim() : (rightSide.textContent || '').trim();
                 }
               }
             }
-            if (!team) {
-              const generalLink = document.querySelector('a[href*="/team/"]');
-              if (generalLink) {
-                team = (generalLink.textContent || '').trim();
-              }
-            }
-            if (team === '-' || team.toLowerCase() === 'n/a' || team.toLowerCase() === 'no team') {
+
+            const cleanLower = team.toLowerCase().trim();
+            if (
+              !team ||
+              cleanLower === '-' ||
+              cleanLower === 'n/a' ||
+              cleanLower === 'none' ||
+              cleanLower === 'no team' ||
+              cleanLower.includes('no team')
+            ) {
               team = '';
             }
 
@@ -420,6 +450,14 @@ export async function scrapeHltvPlayer(rawUrl: string): Promise<HltvScrapedPlaye
     }
   }
 
+  // Resolve Steam ID via Liquipedia and Steam XML API
+  let steamid = ''
+  try {
+    steamid = await resolveSteamIdFromLiquipedia(extractedData.username)
+  } catch (err: any) {
+    console.warn('[HLTV Scraper] Failed to resolve Steam ID from Liquipedia:', err.message)
+  }
+
   return {
     username: extractedData.username,
     firstName: extractedData.firstName,
@@ -428,6 +466,296 @@ export async function scrapeHltvPlayer(rawUrl: string): Promise<HltvScrapedPlaye
     countryName: extractedData.countryTitle,
     team: extractedData.team,
     avatar: localAvatarPath,
-    avatarUrl: fullAvatarUrl
+    avatarUrl: fullAvatarUrl,
+    steamid
   }
 }
+
+function fetchLiquipediaApi(queryString: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const url = `https://liquipedia.net/counterstrike/api.php?${queryString}`
+    const req = https.get(
+      url,
+      {
+        headers: {
+          'User-Agent': 'JTsHud/1.0 (contact@jtshud.local)',
+          'Accept-Encoding': 'gzip'
+        }
+      },
+      (res) => {
+        let stream: NodeJS.ReadableStream = res
+        if (res.headers['content-encoding'] === 'gzip') {
+          stream = res.pipe(zlib.createGunzip())
+        }
+        let data = ''
+        stream.on('data', (chunk) => {
+          data += chunk
+        })
+        stream.on('end', () => {
+          try {
+            resolve(JSON.parse(data))
+          } catch {
+            resolve(null)
+          }
+        })
+        stream.on('error', reject)
+      }
+    )
+    req.on('error', reject)
+    req.setTimeout(8000, () => {
+      req.destroy(new Error('Liquipedia API request timed out'))
+    })
+  })
+}
+
+function fetchSteamXml(steamUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const cleanUrl = steamUrl.replace(/[?#].*$/, '').replace(/\/+$/, '')
+    const targetUrl = `${cleanUrl}/?xml=1`
+
+    execFile(
+      'curl.exe',
+      [
+        '-s',
+        '-L',
+        '--max-time',
+        '8',
+        '-A',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+        targetUrl
+      ],
+      { maxBuffer: 5 * 1024 * 1024 },
+      (error, stdout) => {
+        if (!error && stdout) {
+          resolve(stdout)
+        } else {
+          try {
+            const req = https.get(
+              targetUrl,
+              {
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
+                }
+              },
+              (res) => {
+                let body = ''
+                res.on('data', (chunk) => (body += chunk))
+                res.on('end', () => resolve(body))
+                res.on('error', () => resolve(''))
+              }
+            )
+            req.on('error', () => resolve(''))
+            req.setTimeout(5000, () => {
+              req.destroy()
+              resolve('')
+            })
+          } catch {
+            resolve('')
+          }
+        }
+      }
+    )
+  })
+}
+
+async function fetchLiquipediaSteamViaBrowserWindow(username: string): Promise<string> {
+  return new Promise((resolve) => {
+    let win: BrowserWindow | null = new BrowserWindow({
+      show: false,
+      width: 1280,
+      height: 900,
+      webPreferences: {
+        offscreen: false,
+        nodeIntegration: false,
+        contextIsolation: true,
+        backgroundThrottling: false
+      }
+    })
+
+    let isDone = false
+    let pollInterval: NodeJS.Timeout | null = null
+
+    const cleanup = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+      if (timeoutId) clearTimeout(timeoutId)
+      if (win && !win.isDestroyed()) {
+        try {
+          win.destroy()
+        } catch {
+          /* ignore */
+        }
+      }
+      win = null
+    }
+
+    const timeoutId = setTimeout(() => {
+      if (isDone) return
+      isDone = true
+      cleanup()
+      resolve('')
+    }, 15000)
+
+    win.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, _validatedURL, isMainFrame) => {
+      if (isDone || !isMainFrame || errorCode === -3) return
+      isDone = true
+      cleanup()
+      resolve('')
+    })
+
+    const checkPage = async () => {
+      if (isDone || !win || win.isDestroyed()) return
+
+      try {
+        const title = (win.webContents.getTitle() || '').toLowerCase()
+        if (
+          title.includes('just a moment') ||
+          title.includes('attention required') ||
+          title.includes('cloudflare') ||
+          title.includes('turnstile')
+        ) {
+          return
+        }
+
+        const steamUrl = await win.webContents.executeJavaScript(`
+          (() => {
+            const body = document.body ? (document.body.innerText || '') : '';
+            if (body.includes('There is currently no text in this page.')) {
+              return '';
+            }
+
+            function getByXPath(xpath) {
+              try {
+                const res = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                return res.singleNodeValue;
+              } catch (e) {
+                return null;
+              }
+            }
+
+            // User specified xpath container:
+            // /html/body/div[3]/div[2]/main/div/div/div[3]/div/div[2]/div[1]/div[1]/div[14]/div
+            const container = getByXPath('/html/body/div[3]/div[2]/main/div/div/div[3]/div/div[2]/div[1]/div[1]/div[14]/div');
+            let links = [];
+            if (container) {
+              links = Array.from(container.querySelectorAll('a'));
+            }
+
+            if (links.length === 0) {
+              links = Array.from(document.querySelectorAll('.infobox-cell-2 a, .infobox a, a[href*="steamcommunity.com"]'));
+            }
+
+            for (const link of links) {
+              const href = link.getAttribute('href') || link.href || '';
+              if (href.includes('steamcommunity.com')) {
+                return href;
+              }
+            }
+
+            return '';
+          })()
+        `)
+
+        if (typeof steamUrl === 'string' && steamUrl.trim()) {
+          isDone = true
+          cleanup()
+          resolve(steamUrl.trim())
+        }
+      } catch {
+        /* continue polling */
+      }
+    }
+
+    win.webContents.on('did-finish-load', () => {
+      checkPage()
+    })
+
+    pollInterval = setInterval(checkPage, 1000)
+
+    win.loadURL(`https://liquipedia.net/counterstrike/${encodeURIComponent(username)}`).catch(() => {
+      if (isDone) return
+      isDone = true
+      cleanup()
+      resolve('')
+    })
+  })
+}
+
+export async function resolveSteamIdFromLiquipedia(username: string): Promise<string> {
+  if (!username || !username.trim()) return ''
+
+  const cleanName = username.trim()
+  let steamProfileUrl = ''
+
+  try {
+    // 1. Try Liquipedia MediaWiki API (fast, robust, handles gzip)
+    let apiData = await fetchLiquipediaApi(
+      `action=parse&page=${encodeURIComponent(cleanName)}&prop=text&format=json&redirects=1`
+    )
+
+    let html = apiData?.parse?.text?.['*'] || ''
+
+    // If missing title, try case-insensitive opensearch
+    if (!html || apiData?.error?.code === 'missingtitle') {
+      const searchData = await fetchLiquipediaApi(
+        `action=opensearch&search=${encodeURIComponent(cleanName)}&limit=1&format=json`
+      )
+      if (searchData && Array.isArray(searchData[1]) && searchData[1].length > 0) {
+        const bestMatch = searchData[1][0]
+        apiData = await fetchLiquipediaApi(
+          `action=parse&page=${encodeURIComponent(bestMatch)}&prop=text&format=json&redirects=1`
+        )
+        html = apiData?.parse?.text?.['*'] || ''
+      }
+    }
+
+    if (html && !html.includes('There is currently no text in this page.')) {
+      const steamMatches = html.match(
+        /https?:\/\/(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/[^\s"'<>]+/gi
+      )
+      if (steamMatches && steamMatches.length > 0) {
+        steamProfileUrl = steamMatches[0]
+      }
+    }
+  } catch (err: any) {
+    console.warn('[HLTV Scraper] Liquipedia API lookup failed, falling back to BrowserWindow:', err.message)
+  }
+
+  // 2. Fallback to BrowserWindow if not found via API
+  if (!steamProfileUrl) {
+    try {
+      steamProfileUrl = await fetchLiquipediaSteamViaBrowserWindow(cleanName)
+    } catch (err: any) {
+      console.warn('[HLTV Scraper] Liquipedia BrowserWindow lookup failed:', err.message)
+    }
+  }
+
+  if (!steamProfileUrl) {
+    return ''
+  }
+
+  // 3. Resolve SteamID64 via ?xml=1
+  try {
+    const xml = await fetchSteamXml(steamProfileUrl)
+    if (xml) {
+      const idMatch = xml.match(/<steamID64>(\d{17})<\/steamID64>/)
+      if (idMatch && idMatch[1]) {
+        return idMatch[1]
+      }
+    }
+  } catch (err: any) {
+    console.warn('[HLTV Scraper] Failed to resolve Steam XML for URL:', steamProfileUrl, err.message)
+  }
+
+  // 4. Fallback: if URL was already https://steamcommunity.com/profiles/<17-digit-id>
+  const directIdMatch = steamProfileUrl.match(/\/profiles\/(\d{17})/)
+  if (directIdMatch && directIdMatch[1]) {
+    return directIdMatch[1]
+  }
+
+  return ''
+}
+

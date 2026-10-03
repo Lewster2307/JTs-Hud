@@ -6,7 +6,7 @@
 ### Changes and Additions in this Fork
 
 #### Player & Team Management
-- **HLTV Player Profile Extractor (Experimental)**: Quickly import player profiles by entering an HLTV player URL (e.g. `https://www.hltv.org/player/11816/ropz`). Automatically scrapes the player's username, first name, last name, country, transparent cutout avatar (downloaded and stored locally), and automatically links their team if already present in your teams table (or shows an inline notice if not yet created).
+- **HLTV Player Profile Extractor (Experimental)**: Quickly import player profiles by entering an HLTV player URL (e.g. `https://www.hltv.org/player/11816/ropz`). Automatically scrapes the player's username, first name, last name, country, transparent cutout avatar (downloaded and stored locally), automatically links their team if already present in your teams table (or shows an inline notice if not yet created), and automatically resolves their 64-bit Steam ID via Liquipedia and Steam Community XML.
 - **HLTV Team Profile Extractor (Experimental)**: Quickly import team profiles by entering an HLTV team URL (e.g. `https://www.hltv.org/team/9565/vitality`). Automatically scrapes the team name, short name, country, and downloads the team's transparent logo locally.
 - **Dual Image Upload & Direct URL Download**: Adding or editing team logos and player avatars supports both local file selection and direct web image URLs (e.g. from HLTV or Liquipedia). Images are validated, saved locally, and cleaned up automatically when replaced or removed.
 - **Mandatory Required Fields**: Enforces that players must have a username and teams must have a name, with inline validation blocking empty submissions.
