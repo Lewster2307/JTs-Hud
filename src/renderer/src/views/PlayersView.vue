@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import BaseModal from '../components/base/BaseModal.vue';
 import BaseTable from '../components/base/BaseTable.vue';
 import BaseBadge from '../components/base/BaseBadge.vue';
@@ -6,11 +7,12 @@ import PlayerForm from '../features/players/components/PlayerForm.vue';
 import PlayersPageHeader from '../features/players/components/PlayersPageHeader.vue';
 import PlayersBulkBar from '../features/players/components/PlayersBulkBar.vue';
 import PlayersAssignTeamModal from '../features/players/components/PlayersAssignTeamModal.vue';
+import HltvPlayerModal from '../features/players/components/HltvPlayerModal.vue';
 import { usePlayersView } from '../features/players/composables/usePlayersView';
 import { API_URL } from '../index';
 
 const {
-  players, availableTeams, isPlayersLoading, sortedPlayers, teamMap, tableHeaders,
+  players, availableTeams, fetchTeams, isPlayersLoading, sortedPlayers, teamMap, tableHeaders,
   sortKey, sortDir, handleSort,
   selectedPlayerIds, handleSelectionChange, handleDeleteSelected, handleDeleteAll,
   isAssignTeamModalOpen, selectedTeamForAssign, isAssigningTeam,
@@ -20,6 +22,90 @@ const {
 } = usePlayersView();
 
 const baseUrl = API_URL.replace('/api', '');
+const isHltvModalOpen = ref(false);
+const teamWarning = ref('');
+
+const handleOpenCreate = () => {
+  teamWarning.value = '';
+  openCreateModal();
+};
+
+const handleOpenEdit = (player: any) => {
+  teamWarning.value = '';
+  openEditModal(player);
+};
+
+const handleOpenHltv = async () => {
+  try {
+    await fetchTeams();
+  } catch {
+    /* ignore */
+  }
+  isHltvModalOpen.value = true;
+};
+
+const handleHltvExtractSuccess = async (extracted: any) => {
+  // Always fetch latest teams so newly created teams are immediately available
+  try {
+    await fetchTeams();
+  } catch {
+    /* ignore */
+  }
+
+  let matchedTeamId = '';
+  let warning = '';
+  if (extracted.team) {
+    const clean = String(extracted.team).trim().toLowerCase();
+    const stripped = clean
+      .replace(/^team\s+/, '')
+      .replace(/\s+clan$/, '')
+      .replace(/\s+esports$/, '');
+
+    const found = availableTeams.value.find((t: any) => {
+      const tName = String(t.name || '').trim().toLowerCase();
+      const tShort = String(t.shortName || '').trim().toLowerCase();
+      const tStripped = tName
+        .replace(/^team\s+/, '')
+        .replace(/\s+clan$/, '')
+        .replace(/\s+esports$/, '');
+      const tShortStripped = tShort
+        .replace(/^team\s+/, '')
+        .replace(/\s+clan$/, '')
+        .replace(/\s+esports$/, '');
+
+      return (
+        tName === clean ||
+        tShort === clean ||
+        tStripped === stripped ||
+        tShortStripped === stripped ||
+        (clean.length > 2 && tName.includes(clean)) ||
+        (tName.length > 2 && clean.includes(tName))
+      );
+    });
+
+    if (found && found._id) {
+      matchedTeamId = found._id;
+    } else {
+      warning = `Team "${extracted.team}" from HLTV does not exist in your teams table.`;
+    }
+  }
+
+  formData.value = {
+    username: extracted.username || '',
+    firstName: extracted.firstName || '',
+    lastName: extracted.lastName || '',
+    country: extracted.country || '',
+    team: matchedTeamId,
+    avatar: extracted.avatar || '',
+    isCoach: false,
+    steamid: '',
+    extra: {}
+  };
+
+  teamWarning.value = warning;
+  isEditing.value = false;
+  isModalOpen.value = true;
+};
 
 const openSteamProfile = (steamid: string) => {
   const cleanId = String(steamid).trim();
@@ -42,7 +128,8 @@ const openHltvSearch = (username: string) => {
     <PlayersPageHeader
       :players-count="players.length"
       @delete-all="handleDeleteAll"
-      @add="openCreateModal"
+      @add="handleOpenCreate"
+      @add-hltv="handleOpenHltv"
     />
 
     <PlayersBulkBar
@@ -62,7 +149,7 @@ const openHltvSearch = (username: string) => {
       storage-key="players-table-columns"
       :sort-key="sortKey"
       :sort-dir="sortDir"
-      @edit="openEditModal"
+      @edit="handleOpenEdit"
       @delete="deletePlayer"
       @sort="handleSort"
       @selection-change="handleSelectionChange"
@@ -142,6 +229,7 @@ const openHltvSearch = (username: string) => {
         :teams="availableTeams"
         :is-editing="isEditing"
         :existing-players="players"
+        :team-warning="teamWarning"
         @submit="handleSave"
       />
     </BaseModal>
@@ -154,6 +242,12 @@ const openHltvSearch = (username: string) => {
       :is-assigning="isAssigningTeam"
       @close="isAssignTeamModalOpen = false"
       @confirm="handleAssignTeam"
+    />
+
+    <HltvPlayerModal
+      :is-open="isHltvModalOpen"
+      @close="isHltvModalOpen = false"
+      @extract-success="handleHltvExtractSuccess"
     />
   </div>
 </template>

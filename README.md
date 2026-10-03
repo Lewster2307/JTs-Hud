@@ -6,6 +6,8 @@
 ### Changes and Additions in this Fork
 
 #### Player & Team Management
+- **HLTV Player Profile Extractor (Experimental)**: Quickly import player profiles by entering an HLTV player URL (e.g. `https://www.hltv.org/player/11816/ropz`). Automatically scrapes the player's username, first name, last name, country, transparent cutout avatar (downloaded and stored locally), and automatically links their team if already present in your teams table (or shows an inline notice if not yet created).
+- **HLTV Team Profile Extractor (Experimental)**: Quickly import team profiles by entering an HLTV team URL (e.g. `https://www.hltv.org/team/9565/vitality`). Automatically scrapes the team name, short name, country, and downloads the team's transparent logo locally.
 - **Dual Image Upload & Direct URL Download**: Adding or editing team logos and player avatars supports both local file selection and direct web image URLs (e.g. from HLTV or Liquipedia). Images are validated, saved locally, and cleaned up automatically when replaced or removed.
 - **Mandatory Required Fields**: Enforces that players must have a username and teams must have a name, with inline validation blocking empty submissions.
 - **Unique Team Names & Usernames**: Team names and player usernames are enforced to be unique during creation and backup imports to prevent accidental duplicates.
@@ -176,13 +178,13 @@ Go to **Players** to create and edit player profiles. Each player can have:
 - Team assignment
 - Coach flag
 
-You can also bulk-import player rosters from an Excel spreadsheet using the import feature on the Players page.
+You can create players manually, extract them automatically via **Extract from HLTV (experimental)** by entering an HLTV player profile URL, or bulk-import player rosters from an Excel spreadsheet.
 
 ![Players View](.github/images/players.png)
 
 ### Teams
 
-Go to **Teams** to create teams with a name, short name, logo, and country.
+Go to **Teams** to create teams with a name, short name, logo, and country. You can create teams manually or extract them automatically via **Extract from HLTV (experimental)** by entering an HLTV team profile URL.
 
 ![Teams View](.github/images/teams.png)
 

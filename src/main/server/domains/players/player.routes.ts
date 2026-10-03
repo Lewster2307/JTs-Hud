@@ -7,13 +7,15 @@ import {
   getPlayerById,
   createPlayer,
   updatePlayer,
-  deletePlayer
+  deletePlayer,
+  extractHltvPlayer
 } from './player.controller'
 
 const router = Router()
 
 router.get('/', getPlayers)
 router.get('/avatar/steamid/:steamid', getPlayerAvatar)
+router.post('/from-hltv', extractHltvPlayer)
 router.get('/:id', getPlayerById)
 router.post('/', upload.single('avatar'), createPlayer)
 router.put('/:id', upload.single('avatar'), updatePlayer)

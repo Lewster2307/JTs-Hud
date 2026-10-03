@@ -5,6 +5,12 @@ const api = {
   // Open a URL in the system browser
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
 
+  // Scrape HLTV player profile
+  scrapeHltvPlayer: (url: string): Promise<any> => ipcRenderer.invoke('scrape-hltv-player', url),
+
+  // Scrape HLTV team profile
+  scrapeHltvTeam: (url: string): Promise<any> => ipcRenderer.invoke('scrape-hltv-team', url),
+
   // Listen for update-available notifications from the main process
   onUpdateAvailable: (callback: (version: string) => void): void => {
     ipcRenderer.on('update-available', (_event, version) => callback(version))

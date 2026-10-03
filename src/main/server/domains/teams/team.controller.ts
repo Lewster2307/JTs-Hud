@@ -4,6 +4,7 @@ import { TeamService } from './team.service'
 import { uploadsPath, deleteUploadedFile } from '../../utils/multer'
 import { downloadImageFromUrl } from '../../utils/downloadImage'
 import { PlayerRepository } from '../players/player.repository'
+import { scrapeHltvTeam } from './hltvTeam.scraper'
 
 const teamService = new TeamService()
 const playerRepo = new PlayerRepository()
@@ -122,5 +123,20 @@ export const deleteTeam = async (req: Request, res: Response) => {
     res.status(204).send()
   } catch (error: any) {
     res.status(500).json({ error: error.message })
+  }
+}
+
+export const extractHltvTeam = async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      res.status(400).json({ error: 'Missing or invalid "url" in request body' })
+      return
+    }
+
+    const data = await scrapeHltvTeam(url)
+    res.json(data)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to extract team from HLTV' })
   }
 }

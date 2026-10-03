@@ -211,6 +211,7 @@ export function usePlayersView() {
     // Data
     players,
     availableTeams,
+    fetchTeams,
     isPlayersLoading,
     sortedPlayers,
     teamMap,

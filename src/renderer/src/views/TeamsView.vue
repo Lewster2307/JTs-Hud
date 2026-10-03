@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import BaseModal from '../components/base/BaseModal.vue';
 import BaseTable from '../components/base/BaseTable.vue';
 import BaseBadge from '../components/base/BaseBadge.vue';
 import TeamForm from '../features/teams/components/TeamForm.vue';
 import TeamsPageHeader from '../features/teams/components/TeamsPageHeader.vue';
 import TeamsBulkBar from '../features/teams/components/TeamsBulkBar.vue';
+import HltvTeamModal from '../features/teams/components/HltvTeamModal.vue';
 import { useTeamsView } from '../features/teams/composables/useTeamsView';
 import { API_URL } from '../index';
 
@@ -17,6 +19,20 @@ const {
 } = useTeamsView();
 
 const baseUrl = API_URL.replace('/api', '');
+
+const isHltvModalOpen = ref(false);
+
+const handleHltvExtractSuccess = (extracted: any) => {
+  formData.value = {
+    name: extracted.name || '',
+    shortName: extracted.shortName || extracted.name || '',
+    country: extracted.country || '',
+    logo: extracted.logo || '',
+    extra: {}
+  };
+  isEditing.value = false;
+  isModalOpen.value = true;
+};
 
 const getTeamPlayerCount = (teamId: string) => {
   return players.value.filter(p => p.team === teamId).length;
@@ -36,6 +52,7 @@ const openHltvSearch = (name: string) => {
       :teams-count="teams.length"
       @delete-all="handleDeleteAll"
       @add="openCreateModal"
+      @add-hltv="isHltvModalOpen = true"
     />
 
     <TeamsBulkBar
@@ -117,5 +134,11 @@ const openHltvSearch = (name: string) => {
         @submit="handleSave"
       />
     </BaseModal>
+
+    <HltvTeamModal
+      :is-open="isHltvModalOpen"
+      @close="isHltvModalOpen = false"
+      @extract-success="handleHltvExtractSuccess"
+    />
   </div>
 </template>

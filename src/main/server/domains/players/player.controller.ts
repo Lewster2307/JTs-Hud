@@ -3,6 +3,7 @@ import { PlayerService } from './player.service'
 import { deleteUploadedFile } from '../../utils/multer'
 import { downloadImageFromUrl } from '../../utils/downloadImage'
 import { syncCoaches } from '../../integrations/gsi'
+import { scrapeHltvPlayer } from './hltv.scraper'
 
 const playerService = new PlayerService()
 
@@ -126,5 +127,19 @@ export const deletePlayer = async (req: Request, res: Response) => {
     res.status(204).send()
   } catch (error: any) {
     res.status(500).json({ error: error.message })
+  }
+}
+
+export const extractHltvPlayer = async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      res.status(400).json({ error: 'Missing or empty "url" in request body' })
+      return
+    }
+    const data = await scrapeHltvPlayer(url.trim())
+    res.json(data)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to extract player data from HLTV' })
   }
 }

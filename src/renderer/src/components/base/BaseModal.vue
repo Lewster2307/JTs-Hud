@@ -2,12 +2,22 @@
 import { watch, onUnmounted } from 'vue';
 import BaseButton from './BaseButton.vue';
 
-const props = defineProps<{
-  isOpen: boolean;
-  title: string;
-  formId?: string; // ID of the form inside the slot to trigger submit
-  maxWidthClass?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    isOpen: boolean;
+    title: string;
+    formId?: string; // ID of the form inside the slot to trigger submit
+    maxWidthClass?: string;
+    submitText?: string;
+    submitDisabled?: boolean;
+    isSubmitting?: boolean;
+  }>(),
+  {
+    submitText: 'Save Changes',
+    submitDisabled: false,
+    isSubmitting: false
+  }
+);
 
 const emit = defineEmits(['close', 'cancel']);
 
@@ -63,20 +73,24 @@ onUnmounted(() => {
       </div>
 
       <div class="p-6 border-t border-zinc-700 bg-zinc-800/50 flex gap-3">
-        <BaseButton 
-          @click="$emit('cancel')" 
-          class="flex-1 justify-center"
-        >
-          Cancel
-        </BaseButton>
-        <BaseButton 
-          :form="formId"
-          type="submit" 
-          variant="primary"
-          class="flex-1 justify-center"
-        >
-          Save Changes
-        </BaseButton>
+        <slot name="footer">
+          <BaseButton 
+            @click="$emit('cancel')" 
+            class="flex-1 justify-center"
+            :disabled="isSubmitting"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton 
+            :form="formId"
+            type="submit" 
+            variant="primary"
+            class="flex-1 justify-center"
+            :disabled="submitDisabled || isSubmitting"
+          >
+            {{ isSubmitting ? 'Loading...' : submitText }}
+          </BaseButton>
+        </slot>
       </div>
       
     </div>

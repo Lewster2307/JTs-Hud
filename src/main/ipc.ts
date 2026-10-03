@@ -6,6 +6,8 @@ import { enforceOverlayOnTop } from './overlayUtils'
 import { registerHudKeybinds, unregisterHudKeybinds } from './shortcuts'
 import { getHudsDir, getBuiltinHudDir } from './paths'
 import { setActiveHudId } from './server/server'
+import { scrapeHltvPlayer } from './server/domains/players/hltv.scraper'
+import { scrapeHltvTeam } from './server/domains/teams/hltvTeam.scraper'
 
 const GSI_CFG_CONTENT = `"JTS_HUD_MANAGER"
 {
@@ -207,4 +209,14 @@ export function registerIpcHandlers(): void {
       })
     }
   )
+
+  // Scrape HLTV player data
+  ipcMain.handle('scrape-hltv-player', async (_, url: string) => {
+    return await scrapeHltvPlayer(url)
+  })
+
+  // Scrape HLTV team data
+  ipcMain.handle('scrape-hltv-team', async (_, url: string) => {
+    return await scrapeHltvTeam(url)
+  })
 }
