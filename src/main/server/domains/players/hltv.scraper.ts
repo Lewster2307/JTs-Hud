@@ -16,6 +16,7 @@ export interface HltvScrapedPlayer {
   avatar: string
   avatarUrl: string
   steamid: string
+  isCoach: boolean
 }
 
 export interface RawScrapedPlayerData {
@@ -43,13 +44,12 @@ function parsePlayerHtml(html: string): RawScrapedPlayerData | null {
     html.includes('404') &&
     (html.includes('Page not found') || html.includes('not found') || html.includes('Page does not exist'))
   ) {
-    throw new Error('This player does not exist on HLTV (404 Not Found). Please verify the URL.')
+    throw new Error('This profile does not exist on HLTV (404 Not Found). Please verify the URL.')
   }
 
   if (
     !html ||
-    html.includes('challenge-platform') ||
-    html.includes('Just a moment') ||
+    html.includes('<title>Just a moment...</title>') ||
     html.includes('cf_chl_') ||
     !html.includes('playerNickname')
   ) {
@@ -64,10 +64,10 @@ function parsePlayerHtml(html: string): RawScrapedPlayerData | null {
   const countryAlt = (flagImg.match(/alt="([^"]+)"/i) || [])[1] || ''
   const countrySrc = (flagImg.match(/src="([^"]+)"/i) || [])[1] || ''
 
-  // Team extraction: only inspect the Team row in player profile
+  // Team extraction: inspect Team or Current team row
   let team = ''
   const teamRowMatch =
-    html.match(/<span[^>]*>\s*Team\s*<\/span>[\s\S]*?<span[^>]*class="[^"]*listRight[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
+    html.match(/<span[^>]*>\s*(?:Current\s+)?team\s*<\/span>[\s\S]*?<span[^>]*class="[^"]*listRight[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
     html.match(/<div[^>]*class="[^"]*playerTeam[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
 
   if (teamRowMatch && teamRowMatch[1]) {
@@ -81,6 +81,9 @@ function parsePlayerHtml(html: string): RawScrapedPlayerData | null {
       team = decodeHtml(teamContent.replace(/<[^>]+>/g, '').trim())
     }
   }
+
+  // Strip trailing "(coach)" if present
+  team = team.replace(/\s*\(coach\)\s*$/i, '').trim()
 
   const cleanLower = team.toLowerCase().trim()
   if (
@@ -328,10 +331,13 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
             }
 
             if (!team) {
-              // Try finding the row specifically labeled "Team"
+              // Try finding the row specifically labeled "Team" or "Current team"
               const allSpans = Array.from(document.querySelectorAll('span, div'));
               const teamLabel = allSpans.find(
-                s => s.children.length === 0 && s.textContent.trim().toLowerCase() === 'team'
+                s => s.children.length === 0 && (
+                  s.textContent.trim().toLowerCase() === 'team' ||
+                  s.textContent.trim().toLowerCase() === 'current team'
+                )
               );
               if (teamLabel && teamLabel.parentElement) {
                 const rightSide = teamLabel.parentElement.querySelector('.listRight, span:last-child');
@@ -341,6 +347,9 @@ async function fetchViaBrowserWindow(url: string): Promise<RawScrapedPlayerData>
                 }
               }
             }
+
+            // Strip trailing "(coach)" if present
+            team = team.replace(/\s*\(coach\)\s*$/i, '').trim();
 
             const cleanLower = team.toLowerCase().trim();
             if (
@@ -424,7 +433,11 @@ export async function scrapeHltvPlayer(rawUrl: string): Promise<HltvScrapedPlaye
     throw new Error('Please enter a valid URL')
   }
 
-  if (!parsed.hostname.includes('hltv.org') || !parsed.pathname.includes('/player/')) {
+  const isCoach = parsed.pathname.includes('/coach/')
+  if (
+    !parsed.hostname.includes('hltv.org') ||
+    (!parsed.pathname.includes('/player/') && !isCoach)
+  ) {
     throw new Error('Please enter a valid HLTV player profile URL (e.g. https://www.hltv.org/player/11816/ropz)')
   }
 
@@ -502,7 +515,8 @@ export async function scrapeHltvPlayer(rawUrl: string): Promise<HltvScrapedPlaye
     team: extractedData.team,
     avatar: localAvatarPath,
     avatarUrl: fullAvatarUrl,
-    steamid
+    steamid,
+    isCoach
   }
 }
 

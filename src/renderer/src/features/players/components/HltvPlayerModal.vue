@@ -33,7 +33,8 @@ const handleExtract = async () => {
   const url = hltvUrl.value.trim()
   if (!url || isLoading.value) return
 
-  if (!url.toLowerCase().includes('hltv.org/player/')) {
+  const lowerUrl = url.toLowerCase()
+  if (!lowerUrl.includes('hltv.org/player/') && !lowerUrl.includes('hltv.org/coach/')) {
     errorMessage.value = 'Please enter a valid HLTV player URL (e.g. https://www.hltv.org/player/11816/ropz)'
     return
   }

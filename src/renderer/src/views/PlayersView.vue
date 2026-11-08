@@ -107,7 +107,7 @@ const handleHltvExtractSuccess = async (extracted: any) => {
     country: extracted.country || '',
     team: matchedTeamId,
     avatar: extracted.avatar || '',
-    isCoach: false,
+    isCoach: Boolean(extracted.isCoach),
     steamid: extracted.steamid || '',
     extra: {}
   };
